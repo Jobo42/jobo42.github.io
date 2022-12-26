@@ -1,0 +1,289 @@
+<html>
+  <head>
+    <title>Katherine's Lemur Game</title>
+    <link rel="stylesheet" type="text/css" href="styles.css">
+  </head>
+  <body style="background-image:url('jungle_bg.webp');background-size:cover">
+    <div id="fig-click-counter" style="position:absolute;top:0;left:0;"></div>
+    <div id="game-over"></div>
+    <img id="lemur" src="lemur.png" style="width:100px;height:100px;top:417;left:555;position:absolute;"></img>
+
+    <audio id="my-sound" src="lemur.mp3"></audio>
+    <audio id="fig-sound" src="fig_sound.mp3" preload="auto"></audio>
+    <audio id="gameover-sound" src="screaming_lemur_eaten.mp3" preload="auto"></audio>
+    <audio id="hitmarker-sound" src="hitmarker.mp3" preload="auto"></audio>
+
+    <img id="gandalf-image" src="busty_gandalf.jpg" style="display:none;width:220px;height:300px;margin:auto;top:0;
+    bottom:0;left:0;right:0;position:absolute;"></img>
+    <audio id="gandalf-sound" src="gandalf_quote.mp3"></audio>
+
+    <img id="popup-image" src="lulu.jpg" style="display:none;width:300px;height:300px;margin:auto;top:0;
+    bottom:0;left:0;right:0;position:absolute;"></img>
+    <img id="moving-image" src="fig.png" style="width:75px;height:60px;position:absolute;"></img>
+    <script>
+      const listeners = {};
+      const intervals = {};
+      let game_paused = false;
+
+      // ** Clicking on the Lemur **
+      let lemurClicks = 0;
+      const soundArea = document.getElementById('lemur');
+      const mySound = document.getElementById('my-sound');
+      const popupImage = document.getElementById('popup-image');
+
+      function lemurClick() {
+        mySound.currentTime = 0; // reset the sound to the beginning if it has already been played
+        mySound.play();
+        lemurClicks++;
+        if (lemurClicks%3 === 0) {
+          popupImage.style.display = "block";
+          setTimeout(() => {
+            popupImage.style.display = "none";
+          }, 1500); 
+        }
+      }
+      listeners["lemur"] = soundArea.addEventListener('click', lemurClick);
+
+      // ** Clicking on the figs **
+      let figClicks = -1;
+      const figClickCounter = document.getElementById('fig-click-counter');
+      const movingFig = document.getElementById('moving-image');
+      const figSound = document.getElementById("fig-sound");
+      const gandalfImage = document.getElementById("gandalf-image");
+      const gandalfSound = document.getElementById("gandalf-sound");
+
+      function pauseGame() {
+        for (const int_key in intervals) {
+          clearInterval(intervals[int_key]);
+        }
+        for (const lst_key in listeners) {
+          removeEventListener("click", lst_key[listeners]);
+        }
+      }
+      function unpauseGame() {
+        for (const int_key in intervals) {
+          switch (int_key) {
+            case "figFade":
+              intervals["figFade"] = fadeOut(movingFig);
+              break;
+            case "addFossas":
+              intervals["addFossas"] = setInterval(addFossa, 900);
+              break;
+            case "moveFossas":
+              intervals["moveFossas"] = setInterval(moveFossas, 17);
+              break;
+          }
+        }
+
+        for (const lst_key in listeners) {
+          switch (lst_key) {
+            case "lemur":
+              listeners["lemur"] = soundArea.addEventListener('click', lemurClick);
+              break;
+            case "moveFig":
+              listeners["moveFig"] = movingFig.addEventListener('click', moveFig);
+              break;
+          }
+
+          if (typeof(lst_key) === "object") {
+            console.log("fossas")
+            if (lst_key.id.includes("fossa")) {
+              listeners[lst_key] = lst_key.addEventListener('click', function() {
+                lst_key.remove();
+
+                hitmarkerSound.currentTime = 0;
+                hitmarkerSound.play();
+              });
+            }
+          }
+        }
+      }
+
+      function moveFig() {
+        // generate random numbers between 0 and the screen width/height for the top and left properties
+        const rectX = 260;
+        const rectY = 96;
+        const rectWidth = 675;
+        const rectHeight = 300;
+        const top = rectY + Math.floor(Math.random() * rectHeight);
+        const left = rectX + Math.floor(Math.random() * rectWidth);
+        movingFig.style.top = top + "px";
+        movingFig.style.left = left + "px";
+        movingFig.style.opacity = 1;
+
+        // Update fig-click counter
+        figClicks++;
+        figClickCounter.innerHTML = `${figClicks} x <img src="fig-emblem.png" style="width:35px;height:35px;top:4px;position:relative;">`
+        figClickCounter.style.top = "10px";
+        figClickCounter.style.left = "15px";
+        figClickCounter.style.fontSize = "40px";
+
+        figSound.currentTime = 0;
+        figSound.play();
+
+        if (figClicks%50 === 0 && figClicks != 0) {
+          pauseGame()
+
+          gandalfImage.style.display = "block";
+          gandalfSound.play();
+
+          // Put a golden tint on everything
+          const gold_overlay = document.createElement("div");
+          gold_overlay.id = "gold-overlay";
+          document.body.appendChild(gold_overlay);
+
+          setTimeout(() => {
+            gandalfImage.style.display = "none";
+            gold_overlay.remove();
+
+            unpauseGame();
+          }, 7000);
+
+        }
+      }
+      moveFig();
+      listeners["moveFig"] = movingFig.addEventListener('click', moveFig);
+
+      function gameOver(ending_text) {
+        // Clear all intervals
+        for (let i = 1; i < 99999; i++) {
+          clearInterval(i);
+        }
+        // Removing fig listener
+        movingFig.removeEventListener('click', moveFig)
+        // Removing lemur listener
+        soundArea.removeEventListener('click', lemurClick);
+
+        // Make everything gray
+        const gray_overlay = document.createElement("div");
+        gray_overlay.id = "gray-overlay";
+        document.body.appendChild(gray_overlay);
+
+        // Get the element to display the "GAME OVER" message
+        const gameOverElement = document.getElementById("game-over");
+        gameOverElement.innerHTML = ending_text;
+
+        if (ending_text.includes("FOSSA")) {
+          let n = Math.random()
+          if (n <= 0.50) {
+            document.getElementById("gameover-sound").play();
+          } else if (n > 0.80) {
+            const kendrickVideo = document.createElement("video");
+            kendrickVideo.src = "angry_kendrick.mp4";
+            kendrickVideo.zIndex = 998;
+            document.body.appendChild(kendrickVideo);
+            kendrickVideo.play();
+          } else {
+            const coldWorldVideo = document.createElement("video");
+            coldWorldVideo.src = "cold_world.mp4";
+            coldWorldVideo.zIndex = 998;
+            document.body.appendChild(coldWorldVideo);
+            coldWorldVideo.play();
+          }
+        } else {
+          const kendrickVideo = document.createElement("video");
+          kendrickVideo.src = "angry_kendrick.mp4";
+          kendrickVideo.zIndex = 998;
+          document.body.appendChild(kendrickVideo);
+          kendrickVideo.play();
+        }
+       
+      }
+
+      function fadeOut(element) {
+        const interval = setInterval(() => {
+          element.style.opacity -= 0.04;
+          if (element.style.opacity <= 0) {
+            clearInterval(interval);
+            element.remove();
+            gameOver("YOUR FIG VANISHED")
+          }
+        }, 1000);
+        return interval;
+      }
+      intervals["figFade"] = fadeOut(movingFig);
+
+      let numFossas = 0;
+      const hitmarkerSound = document.getElementById("hitmarker-sound")
+      function addFossa() {
+        // Not 100% likely that a fossa will spawn
+        if (Math.random() <= (0.20 + Math.floor(figClicks / 5)*3)) {
+
+          // Create a new image element
+          const img = document.createElement("img");
+          document.body.appendChild(img);
+          img.style.position = "absolute";
+          img.style.width = 225 + "px";
+          img.style.height = 150 + "px"; 
+          img.style.top = 390 + "px"; // All fossas start on the same level
+
+          // 50% chance of the fossa coming from the right or the left.
+          if (Math.random() <= 0.5) {
+            // Going right from the left side
+            img.src = "fossa-right.png";
+            img.id = "fossa right " + numFossas;
+            img.style.left = 1 - img.offsetWidth + "px";
+          } else {
+            // Going left from the right side
+            img.style.left = window.innerWidth - 1;
+            img.src = "fossa-left.png";
+            img.id = "fossa left " + numFossas;
+          }
+          numFossas++;
+
+          listeners[img] = img.addEventListener('click', function() {
+            img.remove()
+
+            hitmarkerSound.currentTime = 0;
+            hitmarkerSound.play();
+          });
+        }
+      }
+      intervals["addFossas"] = setInterval(addFossa, 900);
+
+      function moveFossas() {
+        const images = Array.from(document.querySelectorAll("img[id*=fossa]"));
+        const lemur = document.getElementById("lemur");
+        let speed = Math.floor(3 + Math.floor(figClicks / 50));
+
+        for (let i = 0; i < images.length; i++) {
+          image = images[i];
+          if (image.id.includes("right")) {
+            // Image is moving to the right
+            image.style.left = parseInt(image.style.left) + speed + "px";
+
+            // Fossa got the lemur
+            if ((image.offsetLeft + image.offsetWidth) > (lemur.offsetLeft + 45)) {
+              gameOver("A FOSSA ATE YOU");
+            }
+          } else if (image.id.includes("left")) {
+            // Image is moving to the left
+            image.style.left = parseInt(image.style.left) - speed + "px";
+
+            // Fossa got the lemur
+            if (image.offsetLeft < (lemur.offsetLeft + lemur.offsetWidth - 30)) {
+              gameOver("A FOSSA ATE YOU");
+            }
+          }
+        }
+      }
+      intervals["moveFossas"] = setInterval(moveFossas, 17);
+
+      // pause/unpause the game when the user hits the spacebar
+      document.addEventListener('keydown', (event) => {
+        if (event.key === ' ') {
+          if (game_paused) {
+            unpauseGame();
+            game_paused = false;
+
+            gray_overlay.remove();
+          } else {
+            pauseGame();
+            game_paused = true;
+          }
+        }
+      });
+
+    </script>      
+  </body>
+</html>
